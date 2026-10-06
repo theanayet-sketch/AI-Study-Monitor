@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Study Monitor</title>
+  <style>
+    /* ═══════════════════════════════════════════
+   AI Study Monitor — All-in-one
+   Face Cover → Alarm ON | Face Visible → Alarm OFF
+═══════════════════════════════════════════ */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #0b0d13;
+      --panel: #12151f;
+      --card: #181c2a;
+      --border: #252c42;
+      --accent: #4f7ef8;
+      --green: #22d67a;
+      --red: #ff3a5c;
+      --orange: #ff8c20;
+      --yellow: #f5c330;
+      --purple: #a855f7;
+      --text: #e2e6f3;
+      --muted: #6b7494;
+      --radius: 14px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── ALERT OVERLAY ─────────────────────── */
+    #alert-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    #alert-overlay.show {
+      display: flex;
+      animation: fadeIn .3s ease
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    .alert-pulse {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: rgba(255, 58, 92, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: pulseRing 1.2s ease infinite;
+      box-shadow: 0 0 0 0 rgba(255, 58, 92, 0.5);
+    }
+
+    @keyframes pulseRing {
+      0% {
+        box-shadow: 0 0 0 0 rgba(255, 58, 92, 0.6)
+      }
+
+      70% {
+        box-shadow: 0 0 0 50px rgba(255, 58, 92, 0)
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 58, 92, 0)
+      }
+    }
+
+    .alert-emoji {
+      font-size: 72px;
+      line-height: 1;
+    }
+
+    .alert-title {
+      font-size: clamp(2rem, 5vw, 3.8rem);
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: .04em;
+      text-align: center;
+      text-shadow: 0 0 60px rgba(255, 58, 92, .7);
+      animation: flicker .8s ease infinite alternate;
+    }
+
+    @keyframes flicker {
+      from {
+        text-shadow: 0 0 30px rgba(255, 58, 92, .6)
+      }
+
+      to {
+        text-shadow: 0 0 80px rgba(255, 58, 92, .9), 0 0 20px #ff6a3d
+      }
+    }
+
+    .alert-sub {
+      font-size: 1.3rem;
+      color: #ffeedd;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .alert-counter {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, .55);
+      margin-top: .3rem;
+    }
+
+    /* ── HEADER ────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .75rem 1.5rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 20px rgba(0, 0, 0, .5);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .6rem
+    }
+
+    .logo-icon {
+      font-size: 1.6rem
+    }
+
+    .logo-text {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -.02em
+    }
+
+    .logo-text span {
+      color: var(--accent)
+    }
+
+    .privacy {
+      font-size: .68rem;
+      padding: .25rem .7rem;
+      background: rgba(34, 214, 122, .08);
+      border: 1px solid rgba(34, 214, 122, .25);
+      color: var(--green);
+      border-radius: 20px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: .75rem
+    }
+
+    /* status pill */
+    #status-pill {
+      font-size: .78rem;
+      font-weight: 700;
+      padding: .3rem .9rem;
+      border-radius: 20px;
+      transition: all .3s;
+    }
+
+    #status-pill.focused {
+      background: rgba(34, 214, 122, .12);
+      color: var(--green);
+      border: 1px solid var(--green)
+    }
+
+    #status-pill.alert {
+      background: rgba(255, 58, 92, .12);
+      color: var(--red);
+      border: 1px solid var(--red);
+      animation: pillPulse .8s ease infinite alternate
+    }
+
+    @keyframes pillPulse {
+      from {
+        opacity: 1
+      }
+
+      to {
+        opacity: .5
+      }
+    }
+
+    .btn-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.1rem;
+      width: 38px;
+      height: 38px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-icon:hover {
+      background: rgba(79, 126, 248, .15);
+      border-color: var(--accent)
+    }
+
+    /* ── MAIN ──────────────────────────────── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 290px;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      align-items: start;
+    }
+
+    @media(max-width:800px) {
+      main {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* ── PANEL ──────────────────────────────── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, .4);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .65rem 1rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      font-size: .85rem;
+      font-weight: 600;
+    }
+
+    /* ── WEBCAM ────────────────────────────── */
+    .cam-wrap {
+      position: relative;
+      background: #000;
+      aspect-ratio: 4/3;
+      overflow: hidden;
+    }
+
+    #cam-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scaleX(-1);
+    }
+
+    #cam-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+
+    #cam-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .75rem;
+      color: var(--muted);
+    }
+
+    .ph-icon {
+      font-size: 3.5rem;
+      opacity: .35
+    }
+
+    .btn-start-cam {
+      padding: .6rem 1.4rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 9px;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter .2s, transform .2s;
+    }
+
+    .btn-start-cam:hover {
+      filter: brightness(1.15);
+      transform: translateY(-1px)
+    }
+
+    /* status bar below webcam */
+    #focus-bar {
+      padding: .55rem 1rem;
+      text-align: center;
+      font-size: .88rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      transition: all .3s;
+    }
+
+    #focus-bar.focused {
+      background: rgba(34, 214, 122, .1);
+      color: var(--green)
+    }
+
+    #focus-bar.alert {
+      background: rgba(255, 58, 92, .12);
+      color: var(--red);
+      animation: barFlash .6s ease infinite alternate
+    }
+
+    @keyframes barFlash {
+      from {
+        background: rgba(255, 58, 92, .12)
+      }
+
+      to {
+        background: rgba(255, 58, 92, .22)
+      }
+    }
+
+    /* ── RIGHT PANEL ────────────────────────── */
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem
+    }
+
+    /* face status card */
+    .face-status-card {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .face-circle {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.6rem;
+      transition: all .3s;
+      border: 3px solid;
+    }
+
+    .face-circle.visible {
+      background: rgba(34, 214, 122, .1);
+      border-color: var(--green);
+      box-shadow: 0 0 20px rgba(34, 214, 122, .2);
+    }
+
+    .face-circle.hidden-face {
+      background: rgba(255, 58, 92, .1);
+      border-color: var(--red);
+      box-shadow: 0 0 20px rgba(255, 58, 92, .3);
+      animation: faceShake .4s ease infinite alternate;
+    }
+
+    @keyframes faceShake {
+      from {
+        transform: scale(1)
+      }
+
+      to {
+        transform: scale(1.04)
+      }
+    }
+
+    #face-label {
+      font-size: 1rem;
+      font-weight: 700;
+      transition: color .3s
+    }
+
+    #face-label.visible {
+      color: var(--green)
+    }
+
+    #face-label.alert {
+      color: var(--red)
+    }
+
+    #face-sub {
+      font-size: .75rem;
+      color: var(--muted);
+      text-align: center
+    }
+
+    /* ── STATS GRID ─────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .5rem;
+      padding: .75rem;
+    }
+
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .65rem .75rem;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--accent)
+    }
+
+    .stat-lbl {
+      font-size: .65rem;
+      color: var(--muted);
+      margin-top: 2px
+    }
+
+    /* ── SESSION ────────────────────────────── */
+    .session-card {
+      padding: .75rem
+    }
+
+    .timer {
+      font-size: 2rem;
+      font-weight: 800;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .04em;
+      background: linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      padding: .5rem 0;
+    }
+
+    .session-btns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .45rem;
+      margin-top: .75rem;
+    }
+
+    .sbtn {
+      padding: .5rem;
+      border-radius: 8px;
+      font-size: .78rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all .2s;
+    }
+
+    .sbtn:disabled {
+      opacity: .35;
+      cursor: not-allowed
+    }
+
+    .sbtn.s {
+      background: var(--green);
+      color: #000
+    }
+
+    .sbtn.p {
+      background: var(--yellow);
+      color: #000
+    }
+
+    .sbtn.t {
+      background: var(--red);
+      color: #fff
+    }
+
+    .sbtn.r {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border)
+    }
+
+    .sbtn:hover:not(:disabled) {
+      filter: brightness(1.15);
+      transform: translateY(-1px)
+    }
+
+    /* ── LOG ────────────────────────────────── */
+    .log-head {
+      padding: .45rem .75rem;
+      font-size: .75rem;
+      font-weight: 600;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .log-body {
+      max-height: 180px;
+      overflow-y: auto;
+      padding: .4rem .65rem;
+      display: flex;
+      flex-direction: column-reverse;
+    }
+
+    .log-body::-webkit-scrollbar {
+      width: 4px
+    }
+
+    .log-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px
+    }
+
+    .log-row {
+      display: flex;
+      gap: .5rem;
+      font-size: .72rem;
+      padding: .2rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .04);
+      animation: logIn .25s ease;
+    }
+
+    @keyframes logIn {
+      from {
+        opacity: 0;
+        transform: translateY(-3px)
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+
+    .log-t {
+      color: var(--muted);
+      min-width: 58px;
+      font-variant-numeric: tabular-nums
+    }
+
+    .log-m {
+      color: #9ba3c0
+    }
+
+    /* ── DETECTION CONFIDENCE ───────────────── */
+    .conf-bar-wrap {
+      padding: .6rem .75rem .75rem;
+      border-top: 1px solid var(--border)
+    }
+
+    .conf-label {
+      font-size: .7rem;
+      color: var(--muted);
+      margin-bottom: .35rem;
+      display: flex;
+      justify-content: space-between
+    }
+
+    .conf-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden
+    }
+
+    .conf-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .3s, background .3s
+    }
+
+    /* ── FOOTER ─────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: .9rem;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color .2s;
+    }
+
+    footer a:hover {
+      color: #7fa8ff;
+      text-decoration: underline
+    }
+
+    /* ── MODAL ──────────────────────────────── */
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      background: rgba(0, 0, 0, .65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.open {
+      display: flex
+    }
+
+    .modal-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      min-width: 300px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, .6);
+      animation: modalIn .3s ease;
+    }
+
+    @keyframes modalIn {
+      from {
+        transform: scale(.85);
+        opacity: 0
+      }
+
+      to {
+        transform: scale(1);
+        opacity: 1
+      }
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      text-align: center
+    }
+
+    .sum-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+      margin-bottom: 1.5rem
+    }
+
+    .sum-item {
+      background: var(--card);
+      border-radius: 8px;
+      padding: .7rem;
+      text-align: center
+    }
+
+    .sum-val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--accent)
+    }
+
+    .sum-lbl {
+      font-size: .65rem;
+      color: var(--muted);
+      margin-top: 3px
+    }
+
+    .btn-close {
+      width: 100%;
+      padding: .6rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: .9rem;
+      transition: filter .2s;
+    }
+
+    .btn-close:hover {
+      filter: brightness(1.15)
+    }
+
+    /* light theme */
+    body.light {
+      --bg: #f0f3fb;
+      --panel: #fff;
+      --card: #f5f7ff;
+      --border: #dde2f5;
+      --text: #1a1e30;
+      --muted: #7a80a0;
+      box-shadow: none;
+    }
+
+    body.light header,
+    body.light footer {
+      box-shadow: none
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ══ ALERT OVERLAY ══════════════════════════════════════════ -->
+  <div id="alert-overlay">
+    <div class="alert-pulse">
+      <div class="alert-emoji">😴</div>
+    </div>
+    <div class="alert-title">WAKE UP &amp; STUDY!</div>
+    <div class="alert-sub">🚫 Face Not Visible / Covered</div>
+    <div class="alert-counter" id="alert-counter">Alert for 0s</div>
+  </div>
+
+  <!-- ══ HEADER ════════════════════════════════════════════════ -->
+  <header>
+    <div class="logo">
+      <span class="logo-icon">🎯</span>
+      <div>
+        <div class="logo-text">AI Study <span>Monitor</span></div>
+      </div>
+    </div>
+    <div class="privacy">🔒 100% Local — No Upload</div>
+    <div class="header-right">
+      <div id="status-pill" class="focused">● FOCUSED</div>
+      <button class="btn-icon" id="theme-btn" title="Toggle Theme">🌙</button>
+    </div>
+  </header>
+
+  <!-- ══ MAIN ══════════════════════════════════════════════════ -->
+  <main>
+
+    <!-- LEFT: Webcam -->
+    <div class="panel">
+      <div class="panel-head">
+        <span>📹 Live Webcam Feed</span>
+        <span id="fps-badge" style="font-size:.7rem;color:var(--muted)">— fps</span>
+      </div>
+      <div class="cam-wrap">
+        <video id="cam-video" autoplay muted playsinline></video>
+        <canvas id="cam-canvas"></canvas>
+        <div id="cam-placeholder">
+          <div class="ph-icon">📷</div>
+          <div style="font-size:.85rem">Allow camera access to start monitoring</div>
+          <button class="btn-start-cam" onclick="startCam()">▶ Start Camera</button>
+        </div>
+      </div>
+
+      <!-- confidence bar -->
+      <div class="conf-bar-wrap">
+        <div class="conf-label">
+          <span>Face Detection Confidence</span>
+          <span id="conf-pct">—</span>
+        </div>
+        <div class="conf-bar">
+          <div class="conf-fill" id="conf-fill" style="width:0%;background:var(--green)"></div>
+        </div>
+      </div>
+
+      <div id="focus-bar" class="focused">● FACE VISIBLE — FOCUSED</div>
+    </div>
+
+    <!-- RIGHT col -->
+    <div class="right-col">
+
+      <!-- Face status -->
+      <div class="panel">
+        <div class="panel-head">👤 Face Detection</div>
+        <div class="face-status-card">
+          <div class="face-circle visible" id="face-circle">🧑</div>
+          <div id="face-label" class="visible">Face Visible</div>
+          <div id="face-sub">Monitoring active</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="panel">
+        <div class="panel-head">📊 Session Stats</div>
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-val" id="stat-focused">00:00</div>
+            <div class="stat-lbl">🟢 Focused</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-distracted" style="color:var(--red)">00:00</div>
+            <div class="stat-lbl">🔴 Distracted</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-alerts">0</div>
+            <div class="stat-lbl">⚠️ Alerts</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-score">100%</div>
+            <div class="stat-lbl">🎯 Focus %</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session -->
+      <div class="panel">
+        <div class="panel-head">⏱️ Study Session</div>
+        <div class="session-card">
+          <div class="timer" id="session-timer">00:00:00</div>
+          <div class="session-btns">
+            <button class="sbtn s" id="btn-s" onclick="doSession('start')">▶ Start</button>
+            <button class="sbtn p" id="btn-p" onclick="doSession('pause')" disabled>⏸ Pause</button>
+            <button class="sbtn t" id="btn-t" onclick="doSession('stop')" disabled>⏹ Stop</button>
+            <button class="sbtn r" id="btn-r" onclick="doSession('reset')">↺ Reset</button>
+          </div>
+        </div>
+        <div class="log-head">📋 Activity Log</div>
+        <div class="log-body" id="log-body"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ══ FOOTER ════════════════════════════════════════════════ -->
+  <footer>
+    AI Study Monitor &mdash; All processing is 100% local, your camera data is never uploaded. &nbsp;|&nbsp;
+    Design by <a href="https://www.theanayet.top" target="_blank" rel="noopener">TheAnayet</a>
+  </footer>
+
+  <!-- ══ SUMMARY MODAL ════════════════════════════════════════ -->
+  <div class="modal" id="sum-modal">
+    <div class="modal-box">
+      <div class="modal-title">📊 Session Summary</div>
+      <div class="sum-grid" id="sum-body"></div>
+      <button class="btn-close" onclick="document.getElementById('sum-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+
+  <script src="models-data.js"></script>
+  <script src="face-api.min.js"></script>
+  <script>
+    /* ══════════════════════════════════════════════════════════════
+       CORE LOGIC
+       Rule:  Face NOT visible → alarm ON (continuous)
+              Face visible     → alarm OFF immediately
+    ══════════════════════════════════════════════════════════════ */
+
+    /* ── State ─────────────────────────────────────────────────── */
+    const S = {
+      camOn: false,
+      modelsOk: false,
+      landmarksOk: false,        // eye (landmark) model loaded?
+      alarmOn: false,
+      faceGone: false,        // true when face currently not detected
+      alertStart: null,         // when current alert started
+      alertCount: 0,            // how many times alert fired
+
+      // session
+      sess: "IDLE",       // IDLE | RUNNING | PAUSED | STOPPED
+      sessStart: null,
+      pausedAt: null,
+      totalPaused: 0,
+      focSec: 0,
+      dstSec: 0,
+      focStart: null,
+      dstStart: null,
+      events: [],
+    };
+
+    /* ── DOM ───────────────────────────────────────────────────── */
+    const video = document.getElementById("cam-video");
+    const canvas = document.getElementById("cam-canvas");
+    const ctx = canvas.getContext("2d");
+    const placeholder = document.getElementById("cam-placeholder");
+    const overlay = document.getElementById("alert-overlay");
+    const counter = document.getElementById("alert-counter");
+    const statusPill = document.getElementById("status-pill");
+    const focusBar = document.getElementById("focus-bar");
+    const faceCircle = document.getElementById("face-circle");
+    const faceLbl = document.getElementById("face-label");
+    const faceSub = document.getElementById("face-sub");
+    const confFill = document.getElementById("conf-fill");
+    const confPct = document.getElementById("conf-pct");
+    const fpsBadge = document.getElementById("fps-badge");
+    const logBody = document.getElementById("log-body");
+    const timerEl = document.getElementById("session-timer");
+    const statFoc = document.getElementById("stat-focused");
+    const statDst = document.getElementById("stat-distracted");
+    const statAlerts = document.getElementById("stat-alerts");
+    const statScore = document.getElementById("stat-score");
+
+    /* ── Audio (Web Audio API — beep loop) ─────────────────────── */
+    let audioCtx = null, gainNode = null, alarmPlaying = false;
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.7;
+        gainNode.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    }
+
+    function playBeep() {
+      if (!alarmPlaying) return;
+      ensureAudio();
+
+      // Two-tone urgent alarm
+      [[880, 0, 0.25], [1100, 0.28, 0.25]].forEach(([freq, start, dur]) => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = "square";
+        osc.frequency.value = freq;
+        g.gain.value = 0.18;
+        osc.connect(g); g.connect(gainNode);
+        osc.start(audioCtx.currentTime + start);
+        osc.stop(audioCtx.currentTime + start + dur);
+      });
+
+      setTimeout(() => {if (alarmPlaying) playBeep();}, 700);
+    }
+
+    function startAlarm() {
+      if (S.alarmOn) return;
+      S.alarmOn = true;
+      alarmPlaying = true;
+      playBeep();
+    }
+
+    function stopAlarm() {
+      S.alarmOn = false;
+      alarmPlaying = false;
+    }
+
+    /* ── Load face-api models ──────────────────────────────────── */
+    async function loadModels() {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri("models");
+        S.modelsOk = true;
+        log("✅ AI face detection ready");
+        try {
+          await faceapi.nets.faceLandmark68TinyNet.loadFromUri("models");
+          S.landmarksOk = true;
+          log("✅ Eye detection ready");
+        } catch (e2) {
+          S.landmarksOk = false;
+          log("⚠️ Eye model load failed — only face check active");
+          console.error(e2);
+        }
+      } catch (e) {
+        S.modelsOk = false;
+        log("⚠️ Model load failed — check models/ folder");
+        console.error(e);
+      }
+    }
+
+    /* ── Start Camera ──────────────────────────────────────────── */
+    async function startCam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {width: 640, height: 480, facingMode: "user"},
+          audio: false
+        });
+        video.srcObject = stream;
+        await new Promise(r => video.onloadedmetadata = r);
+        video.play();
+
+        placeholder.style.display = "none";
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        S.camOn = true;
+        log("📷 Camera started");
+        await loadModels();
+        detectionLoop();
+      } catch (err) {
+        alert("Camera error: " + err.message + "\n\nMake sure you allow camera permission.");
+      }
+    }
+
+    /* ── Detection Loop ────────────────────────────────────────── */
+    let lastFpsTime = Date.now(), fpsCount = 0;
+
+    async function detectionLoop() {
+      if (!S.camOn || video.paused || video.readyState < 2) {
+        setTimeout(detectionLoop, 100);
+        return;
+      }
+
+      // FPS
+      fpsCount++;
+      const now = Date.now();
+      if (now - lastFpsTime >= 1000) {
+        fpsBadge.textContent = fpsCount + " fps";
+        fpsCount = 0;
+        lastFpsTime = now;
+      }
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let faceDetected = false;
+      let confidence = 0;
+      let eyesClosed = false;
+
+      if (S.modelsOk) {
+        try {
+          const opts = new faceapi.TinyFaceDetectorOptions({inputSize: 224, scoreThreshold: 0.35});
+          let det = null;
+          if (S.landmarksOk) {
+            const r = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(true);
+            if (r) {
+              det = r.detection;
+              eyesClosed = isEyesClosed(r.landmarks);
+            }
+          } else {
+            det = await faceapi.detectSingleFace(video, opts);
+          }
+
+          if (det) {
+            faceDetected = true;
+            confidence = det.score;
+
+            // Draw face box on canvas
+            const b = det.box;
+            const grd = ctx.createLinearGradient(b.x, b.y, b.x + b.width, b.y + b.height);
+            grd.addColorStop(0, "#22d67a");
+            grd.addColorStop(1, "#4f7ef8");
+            ctx.strokeStyle = grd;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(b.x, b.y, b.width, b.height);
+
+            // Corner accents
+            const cl = 18, lw = 4;
+            ctx.lineWidth = lw;
+            [
+              [b.x, b.y, cl, 0, 0, cl],
+              [b.x + b.width, b.y, -cl, 0, 0, cl],
+              [b.x, b.y + b.height, cl, 0, 0, -cl],
+              [b.x + b.width, b.y + b.height, -cl, 0, 0, -cl],
+            ].forEach(([x, y, dx1, dy1, dx2, dy2]) => {
+              ctx.beginPath();
+              ctx.moveTo(x + dx1, y + dy1); ctx.lineTo(x, y); ctx.lineTo(x + dx2, y + dy2);
+              ctx.stroke();
+            });
+
+            // Label
+            ctx.fillStyle = "rgba(0,0,0,.55)";
+            ctx.fillRect(b.x, b.y - 26, 120, 22);
+            ctx.fillStyle = "#22d67a";
+            ctx.font = "bold 13px Segoe UI";
+            ctx.fillText("FACE DETECTED", b.x + 6, b.y - 10);
+          }
+        } catch (e) {
+          if (!S.detErrLogged) {S.detErrLogged = true; log("⚠️ Detection error: " + e.message);}
+          console.error(e);
+        }
+      }
+
+      // ── Core rule: face gone → alarm, face back → stop ──────────
+      handleFaceState(faceDetected, confidence, eyesClosed);
+
+      // Schedule next frame (~10 fps)
+      setTimeout(detectionLoop, 100);
+    }
+
+    /* ── Eye closed check (Eye Aspect Ratio) ──────────────────── */
+    const EAR_THRESHOLD = 0.19;   // eye open ratio below this = eyes closed
+    function eyeEAR(pts) {
+      const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      return (d(pts[1], pts[5]) + d(pts[2], pts[4])) / (2 * d(pts[0], pts[3]));
+    }
+    function isEyesClosed(lm) {
+      const pts = lm.positions;
+      const ear = (eyeEAR(pts.slice(36, 42)) + eyeEAR(pts.slice(42, 48))) / 2;
+      return ear < EAR_THRESHOLD;
+    }
+
+    /* ── Face State Handler ──────────────────────────────────────
+       Alarm ON  : face missing/covered OR eyes closed (for BAD_DELAY ms)
+       Alarm OFF : face + open eyes clearly visible (for GOOD_DELAY ms)
+       Otherwise (idle / paused / models not ready) : always silent
+    ────────────────────────────────────────────────────────────── */
+    const BAD_DELAY = 1000;   // ms problem must last before alarm starts (ignores blinks)
+    const GOOD_DELAY = 400;    // ms face+eyes must be OK before alarm stops
+    let badSince = null, goodSince = null, alertReason = "face";
+
+    function handleFaceState(faceDetected, conf, eyesClosed) {
+      updateConfBar(conf);
+
+      // Silent unless a session is RUNNING and the AI model is ready
+      if (S.sess !== "RUNNING" || !S.modelsOk) {
+        if (S.alarmOn || S.faceGone) {
+          S.faceGone = false;
+          stopAlarm();
+        }
+        badSince = goodSince = null;
+        showAlert(false);
+        updateFaceUI(faceDetected, conf);
+        updateUI();
+        return;
+      }
+
+      const now = Date.now();
+      const bad = !faceDetected || eyesClosed;
+
+      if (bad) {
+        goodSince = null;
+        if (!badSince) badSince = now;
+        alertReason = !faceDetected ? "face" : "eyes";
+        if (!S.faceGone && now - badSince >= BAD_DELAY) {
+          S.faceGone = true;
+          S.alertStart = now;
+          S.alertCount++;
+          startAlarm();
+          log(alertReason === "face" ? "🚫 Face not visible — ALERT ON" : "😴 Eyes closed — ALERT ON");
+          updateSessionFocus(false);
+        }
+      } else {
+        badSince = null;
+        if (!goodSince) goodSince = now;
+        if (S.faceGone && now - goodSince >= GOOD_DELAY) {
+          S.faceGone = false;
+          stopAlarm();
+          overlay.classList.remove("show");
+          log("✅ Face & eyes visible — alert OFF");
+          updateSessionFocus(true);
+        }
+      }
+
+      if (S.faceGone) {
+        showAlert(true);
+        updateFaceUI(false);
+      } else {
+        showAlert(false);
+        updateFaceUI(true, conf);
+      }
+
+      // Update alert counter text
+      if (S.alarmOn && S.alertStart) {
+        const secs = Math.floor((Date.now() - S.alertStart) / 1000);
+        counter.textContent = `Alert active for ${secs}s`;
+      }
+
+      updateUI();
+    }
+
+    function showAlert(on) {
+      if (on) {
+        overlay.classList.add("show");
+        statusPill.textContent = alertReason === "eyes" ? "● EYES CLOSED" : "● FACE COVERED";
+        statusPill.className = "alert";
+        focusBar.textContent = alertReason === "eyes" ? "😴 EYES CLOSED — ALARM ACTIVE" : "🚫 FACE NOT VISIBLE — ALARM ACTIVE";
+        focusBar.className = "alert";
+      } else {
+        overlay.classList.remove("show");
+        statusPill.textContent = "● FOCUSED";
+        statusPill.className = "focused";
+        focusBar.textContent = "● FACE VISIBLE — FOCUSED";
+        focusBar.className = "focused";
+      }
+    }
+
+    function updateFaceUI(visible, conf) {
+      if (visible) {
+        faceCircle.className = "face-circle visible";
+        faceCircle.textContent = "🧑";
+        faceLbl.textContent = "Face Visible";
+        faceLbl.className = "visible";
+        faceSub.textContent = conf ? `Confidence: ${(conf * 100).toFixed(0)}%` : "Monitoring active";
+      } else {
+        faceCircle.className = "face-circle hidden-face";
+        faceCircle.textContent = "🚫";
+        faceLbl.textContent = "Face Not Detected";
+        faceLbl.className = "alert";
+        faceSub.textContent = "Cover removed or looking away";
+      }
+    }
+
+    function updateConfBar(conf) {
+      const pct = Math.round(conf * 100);
+      confFill.style.width = pct + "%";
+      confFill.style.background = conf > 0.6 ? "var(--green)" : conf > 0.35 ? "var(--yellow)" : "var(--red)";
+      confPct.textContent = conf > 0 ? pct + "%" : "—";
+    }
+
+    /* ── Session ───────────────────────────────────────────────── */
+    let sessionTick = null;
+
+    function doSession(action) {
+      const now = Date.now();
+
+      if (action === "start") {
+        if (S.sess === "IDLE") {
+          Object.assign(S, {
+            sessStart: 0, totalPaused: 0, focSec: 0, dstSec: 0,
+            alertCount: 0, events: []
+          });
+          S.sessStart = now;
+          S.focStart = now;
+          S.dstStart = null;
+          log("▶️ Session started");
+          if (!S.camOn) startCam();
+        } else if (S.sess === "PAUSED") {
+          S.totalPaused += now - S.pausedAt;
+          S.focStart = now;
+          log("▶️ Resumed");
+        }
+        S.sess = "RUNNING";
+        sessionTick = setInterval(tickSession, 500);
+
+      } else if (action === "pause") {
+        if (S.sess !== "RUNNING") return;
+        flushInterval();
+        S.pausedAt = now;
+        S.sess = "PAUSED";
+        clearInterval(sessionTick);
+        log("⏸️ Paused");
+
+      } else if (action === "stop") {
+        if (S.sess === "IDLE" || S.sess === "STOPPED") return;
+        if (S.sess === "RUNNING") flushInterval();
+        S.sess = "STOPPED";
+        clearInterval(sessionTick);
+        log("⏹️ Stopped");
+        showSummary();
+
+      } else if (action === "reset") {
+        clearInterval(sessionTick);
+        Object.assign(S, {
+          sess: "IDLE", sessStart: null, pausedAt: null, totalPaused: 0,
+          focSec: 0, dstSec: 0, focStart: null, dstStart: null,
+          alertCount: 0, events: []
+        });
+        timerEl.textContent = "00:00:00";
+        statFoc.textContent = statDst.textContent = "00:00";
+        statAlerts.textContent = "0";
+        statScore.textContent = "100%";
+        renderLog();
+        log("↺ Reset");
+      }
+
+      updateBtns();
+    }
+
+    function flushInterval() {
+      const now = Date.now();
+      if (S.focStart) {S.focSec += (now - S.focStart) / 1000; S.focStart = null;}
+      if (S.dstStart) {S.dstSec += (now - S.dstStart) / 1000; S.dstStart = null;}
+    }
+
+    function updateSessionFocus(focused) {
+      if (S.sess !== "RUNNING") return;
+      const now = Date.now();
+      if (focused && !S.focStart) {
+        if (S.dstStart) {S.dstSec += (now - S.dstStart) / 1000; S.dstStart = null;}
+        S.focStart = now;
+      } else if (!focused && !S.dstStart) {
+        if (S.focStart) {S.focSec += (now - S.focStart) / 1000; S.focStart = null;}
+        S.dstStart = now;
+      }
+    }
+
+    function getElapsed() {
+      if (!S.sessStart) return 0;
+      let p = S.totalPaused;
+      if (S.sess === "PAUSED" && S.pausedAt) p += Date.now() - S.pausedAt;
+      return Math.max(0, (Date.now() - S.sessStart - p) / 1000);
+    }
+    function getLiveFoc() {
+      let t = S.focSec;
+      if (S.sess === "RUNNING" && S.focStart) t += (Date.now() - S.focStart) / 1000;
+      return t;
+    }
+    function getLiveDst() {
+      let t = S.dstSec;
+      if (S.sess === "RUNNING" && S.dstStart) t += (Date.now() - S.dstStart) / 1000;
+      return t;
+    }
+
+    function tickSession() {updateUI();}
+
+    function updateUI() {
+      if (S.sess === "IDLE") return;
+      const el = getElapsed();
+      const foc = getLiveFoc();
+      const dst = getLiveDst();
+      const pct = el < 1 ? 100 : Math.round(Math.min(100, foc / el * 100));
+
+      timerEl.textContent = hms(el);
+      statFoc.textContent = ms(foc);
+      statDst.textContent = ms(dst);
+      statAlerts.textContent = S.alertCount;
+      statScore.textContent = pct + "%";
+      statScore.style.color = pct >= 75 ? "var(--green)" : pct >= 50 ? "var(--yellow)" : "var(--red)";
+    }
+
+    function updateBtns() {
+      document.getElementById("btn-s").disabled = S.sess === "RUNNING";
+      document.getElementById("btn-p").disabled = S.sess !== "RUNNING";
+      document.getElementById("btn-t").disabled = ["IDLE", "STOPPED"].includes(S.sess);
+    }
+
+    function showSummary() {
+      const el = getElapsed();
+      const foc = getLiveFoc();
+      const dst = getLiveDst();
+      const pct = el < 1 ? 100 : Math.round(foc / el * 100);
+      document.getElementById("sum-body").innerHTML = `
+    <div class="sum-item"><div class="sum-val">${hms(el)}</div><div class="sum-lbl">Total Time</div></div>
+    <div class="sum-item"><div class="sum-val">${hms(foc)}</div><div class="sum-lbl">Focused Time</div></div>
+    <div class="sum-item"><div class="sum-val">${pct}%</div><div class="sum-lbl">Focus Score</div></div>
+    <div class="sum-item"><div class="sum-val">${S.alertCount}</div><div class="sum-lbl">Total Alerts</div></div>
+  `;
+      document.getElementById("sum-modal").classList.add("open");
+    }
+
+    /* ── Log ────────────────────────────────────────────────────── */
+    function log(msg) {
+      const t = new Date().toLocaleTimeString("en-GB", {hour12: false});
+      S.events.push({t, msg});
+      if (S.events.length > 80) S.events.shift();
+      renderLog();
+    }
+    function renderLog() {
+      logBody.innerHTML = "";
+      [...S.events].reverse().forEach(e => {
+        const d = document.createElement("div");
+        d.className = "log-row";
+        d.innerHTML = `<span class="log-t">${e.t}</span><span class="log-m">${e.msg}</span>`;
+        logBody.appendChild(d);
+      });
+    }
+
+    /* ── Helpers ─────────────────────────────────────────────────── */
+    function hms(s) {
+      s = Math.max(0, Math.floor(s));
+      return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+    }
+    function ms(s) {
+      s = Math.max(0, Math.floor(s));
+      return `${p(Math.floor(s / 60))}:${p(s % 60)}`;
+    }
+    function p(n) {return String(n).padStart(2, "0");}
+
+    /* ── Theme ───────────────────────────────────────────────────── */
+    let dark = true;
+    document.getElementById("theme-btn").addEventListener("click", () => {
+      dark = !dark;
+      document.body.classList.toggle("light", !dark);
+      document.getElementById("theme-btn").textContent = dark ? "🌙" : "☀️";
+    });
+
+    /* ── Init ────────────────────────────────────────────────────── */
+    log("🎯 AI Study Monitor ready");
+    log("ℹ️ Press ▶ Start Camera to begin");
+  </script>
+</body>
+
+</html>
